@@ -392,7 +392,9 @@ template <class t>
    probabilityAnnotation<t,prop>(cancel && ec.diffIsTwoToPrecision, UNLIKELY);
    probabilityAnnotation<t,prop>(cancel && ec.diffIsGreaterThanPrecision, VERYUNLIKELY);
    
-   prop exact(cancel && (ec.diffIsZero || ec.diffIsOne)); // For completeness
+   prop anyZero(left.getZero() || right.getZero()); // If one is zero the result is just the other, which must be exact
+   prop anyInf(left.getInf() || right.getInf()); // If one is infinite the result is an exact infinite
+   prop exact((cancel && (ec.diffIsZero || ec.diffIsOne)) || anyZero || anyInf); // For completeness
    
    ubv alignedSum(conditionalLeftShiftOne<t,ubv,prop>(minorCancel,
 						      conditionalRightShiftOne<t,ubv,prop>(overflow, sum)));

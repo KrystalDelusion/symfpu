@@ -128,7 +128,7 @@ template <class t>
 			   const unpackedFloat<t> &left,
 			   const unpackedFloat<t> &right) {
   //typedef typename t::bwt bwt;
-  //typedef typename t::prop prop;
+  typedef typename t::prop prop;
   //typedef typename t::ubv ubv;
   //typedef typename t::sbv sbv;
 
@@ -137,7 +137,10 @@ template <class t>
 
   unpackedFloat<t> divideResult(arithmeticDivide(format, left, right));
   
-  unpackedFloat<t> roundedDivideResult(rounder(format, roundingMode, divideResult));
+  prop anyInf(left.getInf() || right.getInf()); 
+  prop anyZero(left.getZero() || right.getZero());
+  customRounderInfo<t> cri(prop(false), prop(false), anyInf || anyZero, prop(false), prop(false));
+  unpackedFloat<t> roundedDivideResult(customRounder(format, roundingMode, divideResult, cri));
   
   unpackedFloat<t> result(addDivideSpecialCases(format, left, right, roundedDivideResult.getSign(), roundedDivideResult));
 

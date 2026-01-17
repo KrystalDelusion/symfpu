@@ -102,7 +102,11 @@ namespace symfpu {
 
    /* Then round */
    
-   unpackedFloat<t> roundedResult(rounder(format, roundingMode, additionResult));
+   prop mulZero(leftMultiply.getZero() || rightMultiply.getZero()); // Result is (exactly) addArgument
+   prop anyZero(mulZero || addArgument.getZero()); // If the addend is zero, we want to check exactness in the other rounder instead
+   prop anyInf(leftMultiply.getInf() || rightMultiply.getInf() || addArgument.getInf()); // Exact infinity
+   customRounderInfo<t> cri(prop(false), prop(false), anyZero || anyInf, prop(false), prop(false));
+   unpackedFloat<t> roundedResult(customRounder(format, roundingMode, additionResult, cri));
    INVARIANT(roundedResult.valid(format));
    
    // This result is correct as long as neither of multiplyResult or extendedAddArgument is
@@ -118,7 +122,9 @@ namespace symfpu {
    // This means that you need the value of x, rounded to the correct format.
    // formattedArithmeticMultiplyResult is in extended format, thus we have to use a second rounder just for this case.
    // It is not zero, inf or NaN so it only matters when addArgument is zero when it would be returned.
-   unpackedFloat<t> roundedMultiplyResult(rounder(format, roundingMode, formattedArithmeticMultiplyResult));
+   prop skip_exact(!addArgument.getZero()); // If the addArgument is not zero, we don't use this rounding result so we don't care if it's inexact
+   customRounderInfo<t> mulCri(prop(false), prop(false), skip_exact || mulZero || anyInf, prop(false), prop(false));
+   unpackedFloat<t> roundedMultiplyResult(customRounder(format, roundingMode, formattedArithmeticMultiplyResult, mulCri));
 
    unpackedFloat<t> fullMultiplyResult(addMultiplySpecialCases(format, leftMultiply, rightMultiply, roundedMultiplyResult.getSign(), roundedMultiplyResult));
 

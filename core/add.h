@@ -66,6 +66,7 @@ template <class t>
   //prop compatableSigns(ITE(isAdd, signsMatch, !signsMatch));
   prop compatableSigns(isAdd ^ !signsMatch);
 
+  SETFLAG("NV", bothInfinity && !compatableSigns);
   prop generatesNaN(eitherArgumentNan || (bothInfinity && !compatableSigns));
 
 

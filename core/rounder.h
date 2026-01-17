@@ -101,6 +101,9 @@ namespace symfpu {
     typedef typename t::ubv ubv;
 
     /*** Underflow and overflow ***/
+    // Unlike add and mul, div and fma don't skip this for exact outputs of infinity
+    // fma can also trigger this if multiplication goes out of range but is recovered by addition
+    SETFLAG("maybe_OF", overflow);
     
     // On overflow either return inf or max
     prop returnInf(roundingMode == t::RNE() || 
@@ -118,6 +121,9 @@ namespace symfpu {
     probabilityAnnotation<t>(returnZero, LIKELY);   // 0 is more likely than min in most application scenarios
 
 
+    // Only underflow for non-zero result
+    // Unfortunately this doesn't handle inexact subnormals
+    SETFLAG("UF", underflow && !returnZero);
     
     /*** Reconstruct ***/
     unpackedFloat<t> inf(unpackedFloat<t>::makeInf(format, roundedResult.getSign()));
@@ -411,6 +417,7 @@ template <class t>
   // Have to choose the right one dependent on rounding mode
   prop choosenGuardBit(ITE(normalRounding, guardBit, subnormalGuardBit));
   prop choosenStickyBit(ITE(normalRounding, stickyBit, subnormalStickyBit));
+  SETFLAG("NX", (choosenGuardBit || choosenStickyBit) && !known.exact);
   
   prop significandEven(ITE(normalRounding,
 			   extractedSignificand.extract(0,0).isAllZeros(),
@@ -492,6 +499,7 @@ template <class t>
   // So that ITE abstraction works...
   prop overflow(!known.noOverflow && ITE(lateOverflow, prop(true), earlyOverflow));
   prop underflow(!known.noUnderflow && ITE(lateUnderflow, prop(true), earlyUnderflow));
+  SETFLAG("NX", (overflow || underflow) && !known.exact);
   
   unpackedFloat<t> roundedResult(uf.getSign(), roundedExponent, roundedSignificand);
   unpackedFloat<t> result(rounderSpecialCases<t>(format, roundingMode, roundedResult,

@@ -31,8 +31,12 @@ template <class t>
   prop eitherArgumentNaN(left.getNaN() || right.getNaN());
   prop generateNaN((left.getInf() && right.getInf()) ||
 		   (left.getZero() && right.getZero()));
+  SETFLAG("NV", generateNaN);
   
   prop isNaN(eitherArgumentNaN || generateNaN);
+
+  prop div_zero(!left.getZero() && right.getZero());
+  SETFLAG("DZ", div_zero && !isNaN);
 
   prop isInf((!left.getZero() && right.getZero()) ||
 	     (left.getInf() && !right.getInf()));

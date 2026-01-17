@@ -28,6 +28,7 @@ template <class t>
   typedef typename t::prop prop;
 
   prop generateNaN(uf.getSign() && !uf.getZero());
+  SETFLAG("NV", generateNaN);
   prop isNaN(uf.getNaN() || generateNaN);
 
   prop isInf(uf.getInf() && !uf.getSign());

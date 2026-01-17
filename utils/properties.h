@@ -36,6 +36,10 @@
 #define INVARIANT(X) t::invariant(X)
 #endif
 
+#ifndef SETFLAG
+#define SETFLAG(name, prop) t::setflag(name, prop)
+#endif
+
 #endif
 
 

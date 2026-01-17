@@ -33,6 +33,7 @@ template <class t>
   prop generateNan((left.getInf() && right.getZero()) ||
 		   (left.getZero() && right.getInf()));
   prop isNan(eitherArgumentNan || generateNan);
+  SETFLAG("NV", generateNan);
 
   prop isInf(left.getInf() || right.getInf());
 

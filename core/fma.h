@@ -42,6 +42,10 @@ namespace symfpu {
    PRECONDITION(rightMultiply.valid(format));
    PRECONDITION(addArgument.valid(format));
 
+   // "F" extension raises even if addend is qNaN
+   SETFLAG("NV", (leftMultiply.getInf() && rightMultiply.getZero()) ||
+		   (leftMultiply.getZero() && rightMultiply.getInf()));
+
    /* First multiply */
    unpackedFloat<t> arithmeticMultiplyResult(arithmeticMultiply(format, leftMultiply, rightMultiply));
 
@@ -73,6 +77,9 @@ namespace symfpu {
    
 
    /* Then add */
+   prop bothInfinity(formattedArithmeticMultiplyResult.getInf() && addArgument.getInf());
+   prop signsMatch(formattedArithmeticMultiplyResult.getSign() == addArgument.getSign());
+   SETFLAG("NV", bothInfinity && !signsMatch);
    
    // Rounding mode doesn't matter as this is a strict extension
    unpackedFloat<t> extendedAddArgument(convertFloatToFloat(format, extendedFormat, t::RTZ(), addArgument));

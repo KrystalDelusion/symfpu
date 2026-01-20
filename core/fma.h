@@ -105,7 +105,8 @@ namespace symfpu {
    prop mulZero(leftMultiply.getZero() || rightMultiply.getZero()); // Result is (exactly) addArgument
    prop anyZero(mulZero || addArgument.getZero()); // If the addend is zero, we want to check exactness in the other rounder instead
    prop anyInf(leftMultiply.getInf() || rightMultiply.getInf() || addArgument.getInf()); // Exact infinity
-   customRounderInfo<t> cri(prop(false), prop(false), anyZero || anyInf, prop(false), prop(false));
+   prop anyNaN(leftMultiply.getNaN() || rightMultiply.getNaN() || addArgument.getNaN());
+   customRounderInfo<t> cri(prop(false), prop(false), anyZero || anyInf || anyNaN, prop(false), prop(false));
    unpackedFloat<t> roundedResult(customRounder(format, roundingMode, additionResult, cri));
    INVARIANT(roundedResult.valid(format));
    

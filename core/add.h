@@ -394,7 +394,8 @@ template <class t>
    
    prop anyZero(left.getZero() || right.getZero()); // If one is zero the result is just the other, which must be exact
    prop anyInf(left.getInf() || right.getInf()); // If one is infinite the result is an exact infinite
-   prop exact((cancel && (ec.diffIsZero || ec.diffIsOne)) || anyZero || anyInf); // For completeness
+   prop anyNaN(left.getNaN() || right.getNaN());
+   prop exact((cancel && (ec.diffIsZero || ec.diffIsOne)) || anyZero || anyInf || anyNaN); // For completeness
    
    ubv alignedSum(conditionalLeftShiftOne<t,ubv,prop>(minorCancel,
 						      conditionalRightShiftOne<t,ubv,prop>(overflow, sum)));

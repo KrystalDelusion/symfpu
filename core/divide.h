@@ -137,9 +137,10 @@ template <class t>
 
   unpackedFloat<t> divideResult(arithmeticDivide(format, left, right));
   
-  prop anyInf(left.getInf() || right.getInf()); 
   prop anyZero(left.getZero() || right.getZero());
-  customRounderInfo<t> cri(prop(false), prop(false), anyInf || anyZero, prop(false), prop(false));
+  prop anyInf(left.getInf() || right.getInf());
+  prop anyNaN(left.getNaN() || right.getNaN());
+  customRounderInfo<t> cri(prop(false), prop(false), anyZero || anyInf || anyNaN, prop(false), prop(false));
   unpackedFloat<t> roundedDivideResult(customRounder(format, roundingMode, divideResult, cri));
   
   unpackedFloat<t> result(addDivideSpecialCases(format, left, right, roundedDivideResult.getSign(), roundedDivideResult));

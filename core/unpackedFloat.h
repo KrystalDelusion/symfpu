@@ -550,6 +550,83 @@ template <class t>
  };
 
 
+template <class t>
+  struct floatWithStatusFlags {
+    typedef typename t::prop prop;
+    typedef typename t::fpt fpt;
+
+    unpackedFloat<t> val;
+    prop nv;
+    prop dz;
+    prop of;
+    prop uf;
+    prop nx;
+
+    floatWithStatusFlags(const unpackedFloat<t> &_val,
+        const prop &_nv, const prop &_dz, const prop &_of,
+        const prop &_uf, const prop &_nx) : 
+      val(_val), nv(_nv), dz(_dz),
+      of(_of), uf(_uf), nx(_nx) {}
+    floatWithStatusFlags(const unpackedFloat<t> &_val) : 
+      val(_val), nv(prop(false)), dz(prop(false)),
+      of(prop(false)), uf(prop(false)), nx(prop(false)) {}
+    floatWithStatusFlags(const floatWithStatusFlags<t> &old) : val(old.val), nv(old.nv), dz(old.dz), of(old.of), uf(old.uf), nx(old.nx) {}
+
+    prop valid(const fpt &format) const { return val.valid(format); }
+
+    inline const prop & getNaN(void) const { return val.getZero(); }
+    inline const prop & getInf(void) const { return val.getInf(); }
+    inline const prop & getZero(void) const { return val.getZero(); }
+    inline const prop & getSign(void) const { return val.getSign(); }
+
+    static floatWithStatusFlags<t> makeNaN(const fpt &fmt, const prop &nv) {
+      return floatWithStatusFlags<t>(unpackedFloat<t>::makeNaN(fmt),
+                                    nv, prop(false), prop(false), prop(false), prop(false));
+    }
+
+    static floatWithStatusFlags<t> makeDivZero(const fpt &fmt, const prop &s) {
+      return floatWithStatusFlags<t>(unpackedFloat<t>::makeInf(fmt, s),
+                                    prop(false), prop(true), prop(false), prop(false), prop(false));
+    }
+
+    static floatWithStatusFlags<t> makeInexact(const unpackedFloat<t> &val) {
+      return floatWithStatusFlags<t>(val,
+                                    prop(false), prop(false), prop(false), prop(false), prop(true));
+    }
+
+    static floatWithStatusFlags<t> makeOverflow(const unpackedFloat<t> &val) {
+      return floatWithStatusFlags<t>(val,
+                                    prop(false), prop(false), prop(true), prop(false), prop(true));
+    }
+
+    static floatWithStatusFlags<t> makeUnderflow(const unpackedFloat<t> &val) {
+      return floatWithStatusFlags<t>(val,
+                                    prop(false), prop(false), prop(false), prop(true), prop(true));
+    }
+
+    static floatWithStatusFlags<t> makeZero(const fpt &fmt, const prop &s) {
+      return floatWithStatusFlags<t>(unpackedFloat<t>::makeZero(fmt, s));
+    }
+
+    static floatWithStatusFlags<t> makeInf(const fpt &fmt, const prop &s) {
+      return floatWithStatusFlags<t>(unpackedFloat<t>::makeInf(fmt, s));
+    }
+  };
+
+template <class t>
+  struct ite<typename t::prop, floatWithStatusFlags<t> > {					
+  static const floatWithStatusFlags<t> iteOp (const typename t::prop &cond,		
+			    const floatWithStatusFlags<t> &l,					
+			    const floatWithStatusFlags<t> &r) {				
+    return floatWithStatusFlags<t>(ITE(cond, l.val, r.val),
+          ITE(cond, l.nv, r.nv),
+          ITE(cond, l.dz, r.dz),
+          ITE(cond, l.of, r.of),
+          ITE(cond, l.uf, r.uf),
+          ITE(cond, l.nx, r.nx)
+          );
+    }
+ };
 
 
 }

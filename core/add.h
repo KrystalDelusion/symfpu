@@ -108,6 +108,68 @@ template <class t>
 			     additionResult)))));
  }
 
+template <class t>
+  floatWithStatusFlags<t> addAdditionSpecialCasesComplete_flagged (const typename t::fpt &format,
+						    const typename t::rm &roundingMode,
+						    const unpackedFloat<t> &left,
+						    const floatWithStatusFlags<t> &leftID,
+						    const unpackedFloat<t> &right,
+						    const typename t::prop &returnLeft,
+						    const typename t::prop &returnRight,
+						    const floatWithStatusFlags<t> &additionResult,
+						    const typename t::prop &isAdd) {
+
+  typedef typename t::prop prop;
+
+  // NaN
+  prop eitherArgumentNan(left.getNaN() || right.getNaN());
+  prop bothInfinity(left.getInf() && right.getInf());
+  prop signsMatch(left.getSign() == right.getSign());
+  //prop compatableSigns(ITE(isAdd, signsMatch, !signsMatch));
+  prop compatableSigns(isAdd ^ !signsMatch);
+
+  prop generatesNaN(eitherArgumentNan || (bothInfinity && !compatableSigns));
+
+
+  // Inf
+  prop generatesInf((bothInfinity && compatableSigns) ||
+            ( left.getInf() && !right.getInf()) ||
+            (!left.getInf() &&  right.getInf()));
+
+  prop signOfInf(ITE(left.getInf(), left.getSign(), prop(isAdd ^ !right.getSign())));
+
+  
+  // Zero
+  prop bothZero(left.getZero() && right.getZero());
+  prop flipRightSign(!isAdd ^ right.getSign());
+  prop signOfZero(ITE((roundingMode == t::RTN()),
+          left.getSign() || flipRightSign,
+          left.getSign() && flipRightSign));
+
+  prop  idLeft(!left.getZero() &&  right.getZero());
+  prop idRight( left.getZero() && !right.getZero());
+
+  // At most one of idLeft, idRight, generatesNaN, generatesInf and bothZero is true.
+  // If used in addition additionResult is guaranteed to not be NaN.
+
+  // Subtle trick : as the input to this will have been rounded it will have
+  // an ITE with the default values "on top", thus doing the special cases
+  // first (inner) rather than last (outer) allows them to be compacted better
+  return ITE(idRight || returnRight,
+    floatWithStatusFlags<t>(ITE(isAdd,
+      right,
+      negate(format, right))),
+    ITE(idLeft || returnLeft,
+      leftID,
+      ITE(generatesNaN,
+        floatWithStatusFlags<t>::makeNaN(format, bothInfinity && !compatableSigns),
+        ITE(generatesInf,
+          floatWithStatusFlags<t>::makeInf(format, signOfInf),
+          ITE(bothZero,
+            floatWithStatusFlags<t>::makeZero(format, signOfZero),
+            additionResult)))));
+ }
+
 
   // leftID is the value returned in the idLeft case (i.e. when left is not a
   // special number and right is zero).  This is needed by FMA as the flags
@@ -125,6 +187,19 @@ template <class t>
 					    additionResult, isAdd);
   }
 
+template <class t>
+  floatWithStatusFlags<t> addAdditionSpecialCasesWithID_flagged (const typename t::fpt &format,
+						  const typename t::rm &roundingMode,
+						  const unpackedFloat<t> &left,
+						  const floatWithStatusFlags<t> &leftID,
+						  const unpackedFloat<t> &right,
+						  const floatWithStatusFlags<t> &additionResult,
+						  const typename t::prop &isAdd) {
+  return addAdditionSpecialCasesComplete_flagged<t>(format, roundingMode, left, leftID,
+					    right, typename t::prop(false), typename t::prop(false),
+					    additionResult, isAdd);
+  }
+
 
   // This is the usual case; use this one!
   template <class t>
@@ -135,6 +210,19 @@ template <class t>
 					    const unpackedFloat<t> &additionResult,
 					    const typename t::prop &isAdd) {
     return addAdditionSpecialCasesComplete<t>(format, roundingMode, left, left,
+					      right, typename t::prop(false), typename t::prop(false),
+					      additionResult, isAdd);
+  }
+
+  template <class t>
+  floatWithStatusFlags<t> addAdditionSpecialCases_flagged (const typename t::fpt &format,
+					    const typename t::rm &roundingMode,
+					    const unpackedFloat<t> &left,
+					    const unpackedFloat<t> &right,
+					    const floatWithStatusFlags<t> &additionResult,
+					    const typename t::prop &isAdd) {
+    floatWithStatusFlags<t> left_flagged(left);
+    return addAdditionSpecialCasesComplete_flagged<t>(format, roundingMode, left, left_flagged,
 					      right, typename t::prop(false), typename t::prop(false),
 					      additionResult, isAdd);
   }
@@ -645,6 +733,35 @@ template <class t>
    unpackedFloat<t> roundedAdditionResult(customRounder(format, roundingMode, additionResult.uf, additionResult.known));
 
    unpackedFloat<t> result(addAdditionSpecialCases(format, roundingMode, left, right, roundedAdditionResult, isAdd));
+
+   POSTCONDITION(result.valid(format));
+
+   return result;
+ }
+
+template <class t>
+   floatWithStatusFlags<t> add_flagged (const typename t::fpt &format,
+			 const typename t::rm &roundingMode,
+			 const unpackedFloat<t> &left,
+			 const unpackedFloat<t> &right,
+			 const typename t::prop &isAdd) {
+
+   typedef typename t::prop prop;
+
+   PRECONDITION(left.valid(format));
+   PRECONDITION(right.valid(format));
+
+   // Optimisation : add a flag which assumes that left and right are in the correct order
+   prop knownInCorrectOrder(false);
+
+   exponentCompareInfo<t> ec(addExponentCompare<t>(left.getExponent().getWidth() + 1, left.getSignificand().getWidth(),
+						   left.getExponent(), right.getExponent(), knownInCorrectOrder));
+
+   floatWithCustomRounderInfo<t> additionResult(arithmeticAdd(format, roundingMode, left, right, isAdd, knownInCorrectOrder, ec));
+
+   floatWithStatusFlags<t> roundedAdditionResult(customRounder_flagged(format, roundingMode, additionResult.uf, additionResult.known));
+
+   floatWithStatusFlags<t> result(addAdditionSpecialCases_flagged(format, roundingMode, left, right, roundedAdditionResult, isAdd));
 
    POSTCONDITION(result.valid(format));
 

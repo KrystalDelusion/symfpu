@@ -48,6 +48,32 @@ template <class t>
  }
 
 template <class t>
+  floatWithStatusFlags<t> addMultiplySpecialCases_flagged (const typename t::fpt &format,
+					    const unpackedFloat<t> &left,
+					    const unpackedFloat<t> &right,
+					    const typename t::prop &sign,
+					    const floatWithStatusFlags<t> &multiplyResult) {
+  typedef typename t::prop prop;
+
+  prop eitherArgumentNan(left.getNaN() || right.getNaN());
+  prop generateNan((left.getInf() && right.getZero()) ||
+		   (left.getZero() && right.getInf()));
+  prop isNan(eitherArgumentNan || generateNan);
+
+  prop isInf(left.getInf() || right.getInf());
+
+  prop isZero(left.getZero() || right.getZero());
+
+  return ITE(isNan,
+    floatWithStatusFlags<t>::makeNaN(format, generateNan),
+    ITE(isInf,
+      floatWithStatusFlags<t>::makeInf(format, sign),
+      ITE(isZero,
+        floatWithStatusFlags<t>::makeZero(format, sign),
+        multiplyResult)));
+ }
+
+template <class t>
   unpackedFloat<t> arithmeticMultiply (const typename t::fpt &format,
 				       const unpackedFloat<t> &left,
 				       const unpackedFloat<t> &right) {
@@ -122,6 +148,26 @@ template <class t>
   unpackedFloat<t> roundedMultiplyResult(rounder(format, roundingMode, multiplyResult));
   
   unpackedFloat<t> result(addMultiplySpecialCases(format, left, right, roundedMultiplyResult.getSign(), roundedMultiplyResult));
+
+  POSTCONDITION(result.valid(format));
+
+  return result;
+ }
+
+template <class t>
+  floatWithStatusFlags<t> multiply_flagged (const typename t::fpt &format,
+			     const typename t::rm &roundingMode,
+			     const unpackedFloat<t> &left,
+			     const unpackedFloat<t> &right) {
+
+  PRECONDITION(left.valid(format));
+  PRECONDITION(right.valid(format));
+
+  unpackedFloat<t> multiplyResult(arithmeticMultiply(format, left, right));
+  
+  floatWithStatusFlags<t> roundedMultiplyResult(rounder_flagged(format, roundingMode, multiplyResult));
+  
+  floatWithStatusFlags<t> result(addMultiplySpecialCases_flagged(format, left, right, roundedMultiplyResult.getSign(), roundedMultiplyResult));
 
   POSTCONDITION(result.valid(format));
 

@@ -138,6 +138,121 @@ namespace symfpu {
    return result;
  }
 
+ template <class t>
+   floatWithStatusFlags<t> fma_flagged (const typename t::fpt &format,
+			 const typename t::rm &roundingMode,
+			 const unpackedFloat<t> &leftMultiply,
+			 const unpackedFloat<t> &rightMultiply,
+			 const unpackedFloat<t> &addArgument) {
+   
+   typedef typename t::bwt bwt;
+   typedef typename t::prop prop;
+   //typedef typename t::ubv ubv;
+   typedef typename t::sbv sbv;
+   typedef typename t::fpt fpt;
+  
+   PRECONDITION(leftMultiply.valid(format));
+   PRECONDITION(rightMultiply.valid(format));
+   PRECONDITION(addArgument.valid(format));
+
+   /* First multiply */
+   unpackedFloat<t> arithmeticMultiplyResult(arithmeticMultiply(format, leftMultiply, rightMultiply));
+
+   sbv min(unpackedFloat<t>::minSubnormalExponent(format));
+   sbv max(unpackedFloat<t>::maxNormalExponent(format));
+   sbv multiplyResultExponentUpperBound(expandingAddWithCarryIn<t>(max, max, true));  // + 1 for renormalisation of the top bit
+   sbv multiplyResultExponentLowerBound(expandingAddWithCarryIn<t>(min, min, false));
+   INVARIANT(arithmeticMultiplyResult.wellFormed(multiplyResultExponentLowerBound, multiplyResultExponentUpperBound));
+
+   // To meet the preconditions of other methods, we need to find a format
+   // which is able to represent the value we have.
+   // It is tempting to say this should be:
+   //  fpt extendedFormat(format.exponentWidth() + 1, format.significandWidth() * 2);
+   // And for many formats, this will work.
+   // However the amount that that exponentWidth adds is not necessarily
+   // the same at (e,s) and (e+1,2*s).  So we have to do this which
+   // may result in a slightly wider exponent than we need.
+
+   fpt extendedFormat(arithmeticMultiplyResult.getExponent().getWidth(), format.significandWidth() * 2);
+
+   bwt currentExponentWidth = arithmeticMultiplyResult.getExponent().getWidth();
+   bwt targetExponentWidth = unpackedFloat<t>::exponentWidth(extendedFormat);
+   INVARIANT(targetExponentWidth >= currentExponentWidth);
+   bwt extension = targetExponentWidth - currentExponentWidth;
+   
+   unpackedFloat<t> formattedArithmeticMultiplyResult(arithmeticMultiplyResult.getSign(), arithmeticMultiplyResult.getExponent().extend(extension), arithmeticMultiplyResult.getSignificand());   
+   INVARIANT(formattedArithmeticMultiplyResult.valid(extendedFormat));
+
+   
+
+   /* Then add */
+   
+   // Rounding mode doesn't matter as this is a strict extension
+   unpackedFloat<t> extendedAddArgument(convertFloatToFloat(format, extendedFormat, t::RTZ(), addArgument));
+
+   prop knownInCorrectOrder(false);
+   exponentCompareInfo<t> ec(addExponentCompare<t>(formattedArithmeticMultiplyResult.getExponent().getWidth() + 1,
+						   formattedArithmeticMultiplyResult.getSignificand().getWidth(),
+						   formattedArithmeticMultiplyResult.getExponent(),
+						   extendedAddArgument.getExponent(),
+						   knownInCorrectOrder));
+
+   unpackedFloat<t> additionResult(arithmeticAdd(extendedFormat, roundingMode, formattedArithmeticMultiplyResult, extendedAddArgument, prop(true), knownInCorrectOrder, ec).uf);
+   // Custom rounder flags are ignored as they are not applicable in this case
+
+   // The invariants on this are tighter than you might think
+   // In most formats the range of the multiply dominates
+   // WORK IN PROGRESS
+   INVARIANT(additionResult.wellFormed(multiplyResultExponentLowerBound.matchWidth(additionResult.getExponent()), multiplyResultExponentUpperBound.matchWidth(additionResult.getExponent())));
+
+
+   /* Then round */
+   
+   floatWithStatusFlags<t> roundedResult(rounder_flagged(format, roundingMode, additionResult));
+   INVARIANT(roundedResult.valid(format));
+   
+   // This result is correct as long as neither of multiplyResult or extendedAddArgument is
+   // 0, Inf or NaN.  Note that roundedResult may be zero from cancelation or underflow
+   // or infinity due to rounding. If it is, it has the correct sign.
+
+
+
+   /* Finally, the special cases */
+   
+   // One disadvantage to having a flag for zero and default exponents and significands for zero
+   // that are not (min, 0) is that the x + (+/-)0 case has to be handled by the addition special cases.
+   // This means that you need the value of x, rounded to the correct format.
+   // formattedArithmeticMultiplyResult is in extended format, thus we have to use a second rounder just for this case.
+   // It is not zero, inf or NaN so it only matters when addArgument is zero when it would be returned.
+   floatWithStatusFlags<t> roundedMultiplyResult(rounder_flagged(format, roundingMode, formattedArithmeticMultiplyResult));
+
+   floatWithStatusFlags<t> fullMultiplyResult(addMultiplySpecialCases_flagged(format, leftMultiply, rightMultiply, roundedMultiplyResult.getSign(), roundedMultiplyResult));
+
+   
+   // We need the flags from the multiply special cases, determined on the arithemtic result,
+   // i.e. handling special values and not the underflow / overflow of the result.
+   // But we will use roundedMultiplyResult instead of the value so ...
+   unpackedFloat<t> dummyZero(unpackedFloat<t>::makeZero(format, prop(false)));
+   unpackedFloat<t> dummyValue(unpackedFloat<t>(dummyZero.getSign(), dummyZero.getExponent(), dummyZero.getSignificand()));
+
+   unpackedFloat<t> multiplyResultWithSpecialCases(addMultiplySpecialCases(format, leftMultiply, rightMultiply, formattedArithmeticMultiplyResult.getSign(), dummyValue));
+
+   // fma propagates NV flag from multiply (and only NV flag)
+   floatWithStatusFlags<t> result(ITE(fullMultiplyResult.nv,
+    floatWithStatusFlags<t>::makeNaN(format, prop(true)),
+    addAdditionSpecialCasesWithID_flagged(format,
+							 roundingMode,
+							 multiplyResultWithSpecialCases,
+							 fullMultiplyResult, // for the identity case
+							 addArgument,
+							 roundedResult,
+							 prop(true))));
+   
+   POSTCONDITION(result.valid(format));
+   
+   return result;
+ }
+
 /*
  * BUGS : 
  * 1. sign of zero different for exact 0 and underflow

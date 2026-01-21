@@ -44,6 +44,29 @@ template <class t>
 		     sqrtResult)));
  }
 
+template <class t>
+  floatWithStatusFlags<t> addSqrtSpecialCases_flagged (const typename t::fpt &format,
+					  const unpackedFloat<t> &uf,
+					  const typename t::prop &sign,
+					  const floatWithStatusFlags<t> &sqrtResult) {
+  typedef typename t::prop prop;
+
+  prop generateNaN(uf.getSign() && !uf.getZero());
+  prop isNaN(uf.getNaN() || generateNaN);
+
+  prop isInf(uf.getInf() && !uf.getSign());
+
+  prop isZero(uf.getZero());
+
+  return ITE(isNaN,
+    floatWithStatusFlags<t>::makeNaN(format, generateNaN),
+    ITE(isInf,
+      floatWithStatusFlags<t>::makeInf(format, prop(false)),
+      ITE(isZero,
+        floatWithStatusFlags<t>::makeZero(format, sign),
+        sqrtResult)));
+ }
+
 
  template <class t>
   unpackedFloat<t> arithmeticSqrt (const typename t::fpt &format,
@@ -178,6 +201,35 @@ template <class t>
   unpackedFloat<t> roundedSqrtResult(customRounder(format, roundingMode, sqrtResult, cri));
   
   unpackedFloat<t> result(addSqrtSpecialCases(format, uf, roundedSqrtResult.getSign(), roundedSqrtResult));
+
+  POSTCONDITION(result.valid(format));
+
+  return result;
+ }
+
+template <class t>
+  floatWithStatusFlags<t> sqrt_flagged (const typename t::fpt &format,
+			   const typename t::rm &roundingMode,
+			   const unpackedFloat<t> &uf) {
+    typedef typename t::prop prop;
+
+  PRECONDITION(uf.valid(format));
+
+  unpackedFloat<t> sqrtResult(arithmeticSqrt(format, uf));
+
+  prop noOverflow(true);
+  prop noUnderflow(true);
+
+  prop canHaveSubnormalResults(positionOfLeadingOne(format.significandWidth()) >= format.exponentWidth() - 1);
+
+  prop noSignificandOverflow(!((roundingMode == t::RTP() && !sqrtResult.getSign()) ||
+			       (roundingMode == t::RTN() &&  sqrtResult.getSign())));
+
+  customRounderInfo<t> cri(noOverflow, noUnderflow, prop(false), !canHaveSubnormalResults, noSignificandOverflow);
+
+  floatWithStatusFlags<t> roundedSqrtResult(customRounder_flagged(format, roundingMode, sqrtResult, cri));
+  
+  floatWithStatusFlags<t> result(addSqrtSpecialCases_flagged(format, uf, roundedSqrtResult.getSign(), roundedSqrtResult));
 
   POSTCONDITION(result.valid(format));
 

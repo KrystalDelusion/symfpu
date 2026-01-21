@@ -53,6 +53,38 @@ template <class t>
 		     divideResult)));
  }
 
+template <class t>
+  floatWithStatusFlags<t> addDivideSpecialCases_flagged (const typename t::fpt &format,
+					  const unpackedFloat<t> &left,
+					  const unpackedFloat<t> &right,
+					  const typename t::prop &sign,
+					  const floatWithStatusFlags<t> &divideResult) {
+  typedef typename t::prop prop;
+
+  prop eitherArgumentNaN(left.getNaN() || right.getNaN());
+  prop generateNaN((left.getInf() && right.getInf()) ||
+		   (left.getZero() && right.getZero()));
+  
+  prop isNaN(eitherArgumentNaN || generateNaN);
+
+  prop divZero(!left.getZero() && right.getZero());
+
+  prop isInf(left.getInf() && !right.getInf());
+
+  prop isZero((!left.getInf() && right.getInf()) ||
+	      (left.getZero() && !right.getZero()));
+
+  return ITE(isNaN,
+    floatWithStatusFlags<t>::makeNaN(format, generateNaN),
+    ITE(divZero,
+      floatWithStatusFlags<t>::makeDivZero(format, sign),
+      ITE(isInf,
+        floatWithStatusFlags<t>::makeInf(format, sign),
+        ITE(isZero,
+          floatWithStatusFlags<t>::makeZero(format, sign),
+          divideResult))));
+ }
+
 
  template <class t>
   unpackedFloat<t> arithmeticDivide (const typename t::fpt &format,
@@ -148,6 +180,26 @@ template <class t>
   POSTCONDITION(result.valid(format));
 
   return result;
+ }
+
+ template <class t>
+  floatWithStatusFlags<t> divide_flagged (const typename t::fpt &format,
+			   const typename t::rm &roundingMode,
+			   const unpackedFloat<t> &left,
+			   const unpackedFloat<t> &right) {
+
+  PRECONDITION(left.valid(format));
+  PRECONDITION(right.valid(format));
+
+  unpackedFloat<t> divideResult(arithmeticDivide(format, left, right));
+  
+  floatWithStatusFlags<t> roundedDivideResult(rounder_flagged(format, roundingMode, divideResult));
+  
+  floatWithStatusFlags<t> result_flagged(addDivideSpecialCases_flagged(format, left, right, roundedDivideResult.getSign(), roundedDivideResult));
+
+  POSTCONDITION(result_flagged.valid(format));
+
+  return result_flagged;
  }
 
 

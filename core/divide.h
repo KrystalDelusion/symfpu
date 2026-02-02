@@ -63,7 +63,7 @@ template <class t>
   
   prop isNaN(eitherArgumentNaN || generateNaN);
 
-  prop divZero(!left.getZero() && right.getZero());
+  prop divZero(!left.getZero() && !left.getInf() && right.getZero());
 
   prop isInf(left.getInf() && !right.getInf());
 

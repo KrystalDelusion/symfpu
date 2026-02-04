@@ -745,13 +745,11 @@ template <class t>
   
   unpackedFloat<t> roundedResult(uf.getSign(), roundedExponent, roundedSignificand);
 
-  // Raise underflow flag for inexact subnormals
-  //   I don't know how known.subnormalExact impacts this, but I don't think it matters for our purposes
-  //   I'm also unclear on if this is detecting tininess before or after rounding
+  // Raise underflow flag for inexact results with subnormal rounding
   prop inexact((choosenGuardBit || choosenStickyBit) && !known.exact);
-  prop subnormal(roundedResult.inSubnormalRange(format, prop(true)));
+  prop tinyBeforeRounding(inexact && !normalRounding);
   floatWithStatusFlags<t> roundedResult_flagged(roundedResult,
-      prop(false), prop(false), prop(false), inexact && subnormal, inexact);
+      prop(false), prop(false), prop(false), tinyBeforeRounding, inexact);
   floatWithStatusFlags<t> result_flagged(rounderSpecialCases_flagged<t>(format, roundingMode, roundedResult_flagged,
       overflow, underflow, uf.getZero()));
 					      

@@ -150,9 +150,9 @@ template <class t>
 
  template <class t>
   unpackedFloat<t> falseDivide (const typename t::fpt &format,
-  // unpackedFloat<t> arithmeticDivide (const typename t::fpt &format,
 				       const unpackedFloat<t> &left,
-				       const unpackedFloat<t> &right) {
+				       const unpackedFloat<t> &right,
+               const typename t::prop &denorm) {
   typedef typename t::bwt bwt;
   typedef typename t::prop prop;
   typedef typename t::ubv ubv;
@@ -168,8 +168,8 @@ template <class t>
   // Subtract the significands instead of a proper divison
   sbv zeroShift = sbv::zero(left.getSignificand().getWidth());
   prop leftSubnorm(left.inSubnormalRange(format, prop(true)));
-  ubv leftShift = ITE(leftSubnorm, left.getSubnormalAmount(format).matchWidth(zeroShift), zeroShift);
-  ubv rightShift = ITE(right.inSubnormalRange(format, prop(true)), right.getSubnormalAmount(format).matchWidth(zeroShift), zeroShift);
+  ubv leftShift = ITE(denorm && leftSubnorm, left.getSubnormalAmount(format).matchWidth(zeroShift), zeroShift);
+  ubv rightShift = ITE(denorm && right.inSubnormalRange(format, prop(true)), right.getSubnormalAmount(format).matchWidth(zeroShift), zeroShift);
 
   // Subnormals are treated as normals with an additional exponent bit, we need to recover the raw value
   // then prefix the left with 10 and the right with 00 (which also ensures the output always has a 1 in one of the first two bits)
@@ -249,12 +249,13 @@ template <class t>
   floatWithStatusFlags<t> falseDivide_flagged (const typename t::fpt &format,
 			   const typename t::rm &roundingMode,
 			   const unpackedFloat<t> &left,
-			   const unpackedFloat<t> &right) {
+			   const unpackedFloat<t> &right,
+         const typename t::prop &denorm) {
 
   PRECONDITION(left.valid(format));
   PRECONDITION(right.valid(format));
 
-  unpackedFloat<t> divideResult(falseDivide(format, left, right));
+  unpackedFloat<t> divideResult(falseDivide(format, left, right, denorm));
   
   floatWithStatusFlags<t> roundedDivideResult(rounder_flagged(format, roundingMode, divideResult));
   

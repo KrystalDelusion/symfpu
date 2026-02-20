@@ -148,6 +148,57 @@ template <class t>
   return divideResult;
  }
 
+ template <class t>
+  unpackedFloat<t> falseDivide (const typename t::fpt &format,
+  // unpackedFloat<t> arithmeticDivide (const typename t::fpt &format,
+				       const unpackedFloat<t> &left,
+				       const unpackedFloat<t> &right) {
+  typedef typename t::bwt bwt;
+  typedef typename t::prop prop;
+  typedef typename t::ubv ubv;
+  typedef typename t::sbv sbv;
+  //typedef typename t::fpt fpt;
+
+  PRECONDITION(left.valid(format));
+  PRECONDITION(right.valid(format));
+
+  // Compute sign
+  prop divideSign(left.getSign() ^ right.getSign());
+
+  // Subtract the significands instead of a proper divison
+  sbv zeroShift = sbv::zero(left.getSignificand().getWidth());
+  prop leftSubnorm(left.inSubnormalRange(format, prop(true)));
+  ubv leftShift = ITE(leftSubnorm, left.getSubnormalAmount(format).matchWidth(zeroShift), zeroShift);
+  ubv rightShift = ITE(right.inSubnormalRange(format, prop(true)), right.getSubnormalAmount(format).matchWidth(zeroShift), zeroShift);
+
+  // Subnormals are treated as normals with an additional exponent bit, we need to recover the raw value
+  // then prefix the left with 10 and the right with 00 (which also ensures the output always has a 1 in one of the first two bits)
+  ubv denormLeft(ubv::one(1).append((left.getSignificand() >> leftShift).extend(1)));
+  ubv denormRight((right.getSignificand() >> rightShift).extend(2));
+
+  ubv result(denormLeft - denormRight);
+
+  // The rest is (mostly) the same, but without the remainder
+  bwt resWidth(result.getWidth());
+  ubv topBit(result.extract(resWidth - 1, resWidth - 1));
+  ubv nextBit(result.extract(resWidth - 2, resWidth - 2));
+
+  prop topBitSet(topBit.isAllOnes());
+  INVARIANT(topBitSet || nextBit.isAllOnes());
+
+  ubv alignedSignificand(conditionalLeftShiftOne<t>(!topBitSet, result));
+  sbv alignedExponent(expandingSubtractWithBorrowIn<t>(left.getExponent(),right.getExponent(), !topBitSet));
+  unpackedFloat<t> divideResult(divideSign, alignedExponent, alignedSignificand);
+
+  sbv min(unpackedFloat<t>::minSubnormalExponent(format));
+  sbv max(unpackedFloat<t>::maxNormalExponent(format));
+  sbv divideResultExponentUpperBound(expandingSubtractWithBorrowIn<t>(max, min, false));
+  sbv divideResultExponentLowerBound(expandingSubtractWithBorrowIn<t>(min, max, true));
+
+  POSTCONDITION(divideResult.wellFormed(divideResultExponentLowerBound, divideResultExponentUpperBound));
+  return divideResult;
+ }
+
 
 // Put it all together...
 template <class t>
@@ -184,6 +235,26 @@ template <class t>
   PRECONDITION(right.valid(format));
 
   unpackedFloat<t> divideResult(arithmeticDivide(format, left, right));
+  
+  floatWithStatusFlags<t> roundedDivideResult(rounder_flagged(format, roundingMode, divideResult));
+  
+  floatWithStatusFlags<t> result_flagged(addDivideSpecialCases_flagged(format, left, right, roundedDivideResult.getSign(), roundedDivideResult));
+
+  POSTCONDITION(result_flagged.valid(format));
+
+  return result_flagged;
+ }
+
+ template <class t>
+  floatWithStatusFlags<t> falseDivide_flagged (const typename t::fpt &format,
+			   const typename t::rm &roundingMode,
+			   const unpackedFloat<t> &left,
+			   const unpackedFloat<t> &right) {
+
+  PRECONDITION(left.valid(format));
+  PRECONDITION(right.valid(format));
+
+  unpackedFloat<t> divideResult(falseDivide(format, left, right));
   
   floatWithStatusFlags<t> roundedDivideResult(rounder_flagged(format, roundingMode, divideResult));
   

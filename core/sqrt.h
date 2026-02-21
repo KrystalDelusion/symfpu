@@ -130,6 +130,45 @@ template <class t>
  }
 
 
+ template <class t>
+  unpackedFloat<t> falseSqrt (const typename t::fpt &format,
+				       const unpackedFloat<t> &uf) {
+  typedef typename t::bwt bwt;
+  typedef typename t::prop prop;
+  typedef typename t::ubv ubv;
+  typedef typename t::sbv sbv;
+  //typedef typename t::fpt fpt;
+
+  PRECONDITION(uf.valid(format));
+
+  // Calculate sign and exponent
+  prop sqrtSign(uf.getSign());
+  sbv exponent(uf.getExponent());
+  bwt exponentWidth(exponent.getWidth());
+  sbv exponentHalved(exponent.signExtendRightShift(sbv::one(exponentWidth)));
+
+  // Rotate significand instead of square root
+  ubv alignedSignificand(uf.getSignificand());
+  bwt sigWidth(alignedSignificand.getWidth());
+  // ubv result(alignedSignificand.append(ubv::zero(2)));
+  ubv result(alignedSignificand.extract(sigWidth-1, sigWidth-1).append(alignedSignificand.extract(0, 0)).append(alignedSignificand.extract(sigWidth-2, 0)).append(ubv::zero(1)));
+
+  // The rest is (mostly) the same, but without the remainder
+  bwt resWidth(result.getWidth());
+  ubv topBit(result.extract(resWidth - 1, resWidth - 1));
+
+  INVARIANT(topBit.isAllOnes());
+
+  unpackedFloat<t> sqrtResult(sqrtSign, exponentHalved, result);
+
+  sbv sqrtResultExponentUpperBound(unpackedFloat<t>::maxNormalExponent(format).signExtendRightShift(sbv::one(exponentWidth)));
+  sbv sqrtResultExponentLowerBound(unpackedFloat<t>::minSubnormalExponent(format).signExtendRightShift(sbv::one(exponentWidth)));
+  POSTCONDITION(sqrtResult.wellFormed(sqrtResultExponentLowerBound, sqrtResultExponentUpperBound));
+
+  return sqrtResult;
+ }
+
+
 // Put it all together...
 template <class t>
   unpackedFloat<t> sqrt (const typename t::fpt &format,
@@ -228,6 +267,30 @@ template <class t>
 
   floatWithStatusFlags<t> roundedSqrtResult(customRounder_flagged(format, roundingMode, sqrtResult, cri));
   
+  floatWithStatusFlags<t> result(addSqrtSpecialCases_flagged(format, uf, roundedSqrtResult.getSign(), roundedSqrtResult));
+
+  POSTCONDITION(result.valid(format));
+
+  return result;
+ }
+
+template <class t>
+  floatWithStatusFlags<t> falseSqrt_flagged (const typename t::fpt &format,
+			   const typename t::rm &roundingMode,
+			   const unpackedFloat<t> &uf) {
+    typedef typename t::prop prop;
+
+  PRECONDITION(uf.valid(format));
+
+  unpackedFloat<t> sqrtResult(falseSqrt(format, uf));
+
+  prop noOverflow(true);
+  prop noUnderflow(true);
+  prop canHaveSubnormalResults(positionOfLeadingOne(format.significandWidth()) >= format.exponentWidth() - 1);
+  prop noSignificandOverflow(false);
+  customRounderInfo<t> cri(noOverflow, noUnderflow, prop(false), !canHaveSubnormalResults, noSignificandOverflow);
+
+  floatWithStatusFlags<t> roundedSqrtResult(customRounder_flagged(format, roundingMode, sqrtResult, cri));
   floatWithStatusFlags<t> result(addSqrtSpecialCases_flagged(format, uf, roundedSqrtResult.getSign(), roundedSqrtResult));
 
   POSTCONDITION(result.valid(format));

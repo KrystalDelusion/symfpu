@@ -388,11 +388,23 @@ template <class t>
  }
 
 
+template <class t>
+ struct ubvWithStatusFlags {
+  typedef typename t::prop prop;
+  typedef typename t::ubv ubv;
+
+  ubv val;
+  prop nv;
+  prop nx;
+
+  ubvWithStatusFlags(const ubv &_val, const prop &_nv, const prop &_nx) :
+    val(_val), nv(_nv), nx(_nx) {}
+ };
 
  // Decimal point position in the bit in the output on the left hand side of the decimal point
  // I.E. if it is positive then it is converting to a fix-point number
  template <class t>
-   typename t::ubv convertFloatToUBV (const typename t::fpt &format,
+   ubvWithStatusFlags<t> convertFloatToUBV_flagged (const typename t::fpt &format,
 				      const typename t::rm &roundingMode,
 				      const unpackedFloat<t> &input,
 				      const typename t::bwt &targetWidth,
@@ -446,7 +458,18 @@ template <class t>
 		  undefValue,
 		  rounded.significand));
 
-   return result;
+   return ubvWithStatusFlags<t>(result, undefinedResult, !undefinedResult && rounded.inexact);
+ }
+
+ template <class t>
+   typename t::ubv convertFloatToUBV (const typename t::fpt &format,
+				      const typename t::rm &roundingMode,
+				      const unpackedFloat<t> &input,
+				      const typename t::bwt &targetWidth,
+				      const typename t::ubv &undefValue,
+				      const typename t::bwt &decimalPointPosition = 0) {
+
+   return convertFloatToUBV_flagged(format, roundingMode, input, targetWidth, undefValue, decimalPointPosition).val;
  }
 
   // Decimal point position in the bit in the output on the left hand side of the decimal point

@@ -206,12 +206,16 @@ namespace symfpu {
   struct significandRounderResult{
     typename t::ubv significand;
     typename t::prop incrementExponent;
+    typename t::prop inexact;
       
     significandRounderResult(const typename t::ubv &sig, const typename t::prop &inc) :
-      significand(sig), incrementExponent(inc) {}
+      significand(sig), incrementExponent(inc), inexact(t::prop(false)) {}
+      
+    significandRounderResult(const typename t::ubv &sig, const typename t::prop &inc, const typename t::prop &nx) :
+      significand(sig), incrementExponent(inc), inexact(nx) {}
       
     significandRounderResult(const significandRounderResult &old) :
-      significand(old.significand), incrementExponent(old.incrementExponent) {}
+      significand(old.significand), incrementExponent(old.incrementExponent), inexact(old.inexact) {}
   };
 
   // Handles rounding the significand to a fixed width
@@ -254,7 +258,8 @@ namespace symfpu {
     
     // Build result
     significandRounderResult<t> result(roundedSignificand.extract(targetWidth-1,0) | carryUpMask,
-				    overflowBit.isAllOnes());
+				    overflowBit.isAllOnes(),
+            guardBit || stickyBit);
 
     return result;
   }

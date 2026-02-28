@@ -85,6 +85,51 @@ unpackedFloat<t> convertFloatToFloat (const typename t::fpt &sourceFormat,
 
 
 template <class t>
+floatWithStatusFlags<t> convertFloatToFloat_flagged (const typename t::fpt &sourceFormat,
+				      const typename t::fpt &targetFormat,
+				      const typename t::rm &roundingMode,
+				      const unpackedFloat<t> &input) {
+
+  PRECONDITION(input.valid(sourceFormat));
+
+  typedef typename t::bwt bwt;
+  typedef typename t::prop prop;
+  //typedef typename t::ubv ubv;
+  //typedef typename t::sbv sbv;
+
+  bool exponentIncreased = unpackedFloat<t>::exponentWidth(sourceFormat) <= unpackedFloat<t>::exponentWidth(targetFormat);
+  bool significandIncreased = unpackedFloat<t>::significandWidth(sourceFormat) <= unpackedFloat<t>::significandWidth(targetFormat);
+  bwt expExtension = (exponentIncreased) ? unpackedFloat<t>::exponentWidth(targetFormat) - unpackedFloat<t>::exponentWidth(sourceFormat) : 0;
+  if (exponentIncreased && significandIncreased) {
+    bwt sigExtension = (significandIncreased) ? unpackedFloat<t>::significandWidth(targetFormat) - unpackedFloat<t>::significandWidth(sourceFormat) : 0;
+    unpackedFloat<t> extended(input.extend(expExtension, sigExtension));
+    POSTCONDITION(extended.valid(targetFormat));    
+    return floatWithStatusFlags<t>(extended);
+  } else {
+    bwt sigExtension = (significandIncreased) ?
+      (unpackedFloat<t>::significandWidth(targetFormat) - unpackedFloat<t>::significandWidth(sourceFormat)) + 2 :
+      ((unpackedFloat<t>::significandWidth(targetFormat) == unpackedFloat<t>::significandWidth(sourceFormat) - 1) ? 1 : 0);
+
+    unpackedFloat<t> extended(input.extend(expExtension, sigExtension));
+
+    floatWithStatusFlags<t> rounded(rounder_flagged(targetFormat, roundingMode, extended));
+
+    floatWithStatusFlags<t> result(ITE(input.getNaN(),
+      floatWithStatusFlags<t>::makeNaN(targetFormat, prop(false)),
+      ITE(input.getInf(),
+        floatWithStatusFlags<t>::makeInf(targetFormat, input.getSign()),
+        ITE(input.getZero(),
+          floatWithStatusFlags<t>::makeZero(targetFormat, input.getSign()),
+          rounded))));
+    
+    POSTCONDITION(result.valid(targetFormat));
+
+    return result;
+  }
+}
+
+
+template <class t>
 unpackedFloat<t> roundToIntegral (const typename t::fpt &format,
 				  const typename t::rm &roundingMode,
 				  const unpackedFloat<t> &input) {
@@ -190,7 +235,7 @@ unpackedFloat<t> roundToIntegral (const typename t::fpt &format,
 
 
 template <class t>
-  unpackedFloat<t> convertUBVToFloat (const typename t::fpt &targetFormat,
+  floatWithStatusFlags<t> convertUBVToFloat_flagged (const typename t::fpt &targetFormat,
 				      const typename t::rm &roundingMode,
 				      const typename t::ubv &preInput,
 				      const typename t::bwt &decimalPointPosition = 0) {
@@ -220,9 +265,18 @@ template <class t>
   unpackedFloat<t> normalised(initial.normaliseUpDetectZero());
 
   // Round (the conversion will catch the cases where no rounding is needed)
-  return convertFloatToFloat(initialFormat, targetFormat, roundingMode, normalised);
+  return convertFloatToFloat_flagged(initialFormat, targetFormat, roundingMode, normalised);
  }
 
+
+template <class t>
+  unpackedFloat<t> convertUBVToFloat (const typename t::fpt &targetFormat,
+				      const typename t::rm &roundingMode,
+				      const typename t::ubv &preInput,
+				      const typename t::bwt &decimalPointPosition = 0) {
+
+  return convertUBVToFloat_flagged(targetFormat, roundingMode, preInput, decimalPointPosition).val;
+}
  
 template <class t>
   unpackedFloat<t> convertSBVToFloat (const typename t::fpt &targetFormat,

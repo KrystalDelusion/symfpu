@@ -279,7 +279,7 @@ template <class t>
 }
  
 template <class t>
-  unpackedFloat<t> convertSBVToFloat (const typename t::fpt &targetFormat,
+  floatWithStatusFlags<t> convertSBVToFloat_flagged (const typename t::fpt &targetFormat,
 				      const typename t::rm &roundingMode,
 				      const typename t::sbv &input,
 				      const typename t::bwt &decimalPointPosition = 0) {
@@ -308,9 +308,17 @@ template <class t>
   unpackedFloat<t> normalised(initial.normaliseUpDetectZero());
 
   // Round (the conversion will catch the cases where no rounding is needed)
-  return convertFloatToFloat(initialFormat, targetFormat, roundingMode, normalised);
+  return convertFloatToFloat_flagged(initialFormat, targetFormat, roundingMode, normalised);
  }
 
+template <class t>
+  unpackedFloat<t> convertSBVToFloat (const typename t::fpt &targetFormat,
+				      const typename t::rm &roundingMode,
+				      const typename t::sbv &input,
+				      const typename t::bwt &decimalPointPosition = 0) {
+
+    return convertSBVToFloat_flagged(targetFormat, roundingMode, input, decimalPointPosition).val;
+  }
 
  // Common conversion code for both convert to sgined and to unsigned.
  // Note that the results will be junk if it is not in bounds, etc.
@@ -442,23 +450,22 @@ template <class t>
  }
 
 
-template <class t>
- struct ubvWithStatusFlags {
+template <class t, class bv>
+ struct bvWithStatusFlags {
   typedef typename t::prop prop;
-  typedef typename t::ubv ubv;
 
-  ubv val;
+  bv val;
   prop nv;
   prop nx;
 
-  ubvWithStatusFlags(const ubv &_val, const prop &_nv, const prop &_nx) :
+  bvWithStatusFlags(const bv &_val, const prop &_nv, const prop &_nx) :
     val(_val), nv(_nv), nx(_nx) {}
  };
 
  // Decimal point position in the bit in the output on the left hand side of the decimal point
  // I.E. if it is positive then it is converting to a fix-point number
  template <class t>
-   ubvWithStatusFlags<t> convertFloatToUBV_flagged (const typename t::fpt &format,
+   bvWithStatusFlags<t, typename t::ubv> convertFloatToUBV_flagged (const typename t::fpt &format,
 				      const typename t::rm &roundingMode,
 				      const unpackedFloat<t> &input,
 				      const typename t::bwt &targetWidth,
@@ -512,7 +519,7 @@ template <class t>
 		  undefValue,
 		  rounded.significand));
 
-   return ubvWithStatusFlags<t>(result, undefinedResult, !undefinedResult && rounded.inexact);
+   return bvWithStatusFlags<t, ubv>(result, undefinedResult, !undefinedResult && rounded.inexact);
  }
 
  template <class t>
@@ -529,7 +536,7 @@ template <class t>
   // Decimal point position in the bit in the output on the left hand side of the decimal point
   // I.E. if it is positive then it is converting to a fix-point number
   template <class t>
-    typename t::sbv convertFloatToSBV (const typename t::fpt &format,
+    bvWithStatusFlags<t, typename t::sbv> convertFloatToSBV_flagged (const typename t::fpt &format,
 				       const typename t::rm &roundingMode,
 				       const unpackedFloat<t> &input,
 				       const typename t::bwt &targetWidth,
@@ -583,9 +590,19 @@ template <class t>
 		  undefValue,
 		  conditionalNegate<t,sbv,prop>(input.getSign(), rounded.significand.toSigned())));
 
-   return result;
+   return bvWithStatusFlags<t, sbv>(result, undefinedResult, !undefinedResult && rounded.inexact);
  }
 
+  template <class t>
+    typename t::sbv convertFloatToSBV (const typename t::fpt &format,
+				       const typename t::rm &roundingMode,
+				       const unpackedFloat<t> &input,
+				       const typename t::bwt &targetWidth,
+				       const typename t::sbv &undefValue,
+				       const typename t::bwt &decimalPointPosition = 0) {
+
+    return convertFloatToSBV_flagged(format, roundingMode, input, targetWidth, undefValue, decimalPointPosition).val;
+  }
 }
 
 #endif

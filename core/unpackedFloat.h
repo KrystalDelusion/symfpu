@@ -574,7 +574,7 @@ template <class t>
 
     prop valid(const fpt &format) const { return val.valid(format); }
 
-    inline const prop & getNaN(void) const { return val.getZero(); }
+    inline const prop & getNaN(void) const { return val.getNaN(); }
     inline const prop & getInf(void) const { return val.getInf(); }
     inline const prop & getZero(void) const { return val.getZero(); }
     inline const prop & getSign(void) const { return val.getSign(); }
@@ -623,8 +623,7 @@ template <class t>
           ITE(cond, l.dz, r.dz),
           ITE(cond, l.of, r.of),
           ITE(cond, l.uf, r.uf),
-          ITE(cond, l.nx, r.nx)
-          );
+          ITE(cond, l.nx, r.nx));
     }
  };
 

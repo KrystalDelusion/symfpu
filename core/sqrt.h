@@ -150,7 +150,6 @@ template <class t>
   // Rotate significand instead of square root
   ubv alignedSignificand(uf.getSignificand());
   bwt sigWidth(alignedSignificand.getWidth());
-  // ubv result(alignedSignificand.append(ubv::zero(2)));
   ubv result(alignedSignificand.extract(sigWidth-1, sigWidth-1).append(alignedSignificand.extract(0, 0)).append(alignedSignificand.extract(sigWidth-2, 0)).append(ubv::zero(1)));
 
   // The rest is (mostly) the same, but without the remainder

@@ -662,17 +662,19 @@ template <class t>
   ubv subnormalIncrementAmount((subnormalMask.modularLeftShift(ubv::one(targetSignificandWidth + 1))) & ~subnormalMask); // The only case when this looses info is earlyUnderflow
   INVARIANT(IMPLIES(subnormalIncrementAmount.isAllZeros(), earlyUnderflow || normalRounding));
   
+  // Determine rounding
+  prop known_exact(known.exact || (known.subnormalExact && !normalRoundingRange));
+  prop roundUpNormal(roundingDecision<t>(roundingMode, uf.getSign(),
+				   extractedSignificand.extract(0,0).isAllZeros(),
+				   guardBit, stickyBit, known_exact));
+  prop roundUpSubnormal(roundingDecision<t>(roundingMode, uf.getSign(),
+				   (extractedSignificand & subnormalIncrementAmount).isAllZeros(),
+				   subnormalGuardBit, subnormalStickyBit, known_exact));
 
   // Have to choose the right one dependent on rounding mode
   prop choosenGuardBit(ITE(normalRounding, guardBit, subnormalGuardBit));
   prop choosenStickyBit(ITE(normalRounding, stickyBit, subnormalStickyBit));
-  
-  prop significandEven(ITE(normalRounding,
-			   extractedSignificand.extract(0,0).isAllZeros(),
-			   ((extractedSignificand & subnormalIncrementAmount).isAllZeros())));
-  prop roundUp(roundingDecision<t>(roundingMode, uf.getSign(), significandEven,
-				   choosenGuardBit, choosenStickyBit,
-				   known.exact || (known.subnormalExact && !normalRoundingRange)));
+  prop roundUp(ITE(normalRounding, roundUpNormal, roundUpSubnormal));
 
 
   // Perform the increment as needed
@@ -750,11 +752,25 @@ template <class t>
   
   unpackedFloat<t> roundedResult(uf.getSign(), roundedExponent, roundedSignificand);
 
-  // Raise underflow flag for inexact results with subnormal rounding
-  prop inexact((choosenGuardBit || choosenStickyBit) && !known.exact);
+  // Tininess before rounding is true for any inexact result with subnormal rounding
+  prop inexact((choosenGuardBit || choosenStickyBit) && !known_exact);
   prop tinyBeforeRounding(inexact && !normalRounding);
+  // Tininess after rounding is only true if the rounded value is still subnormal or
+  // in rare cases when rounding out of a subnormal value:
+  //   raw sig | exp=000 | exp=0001
+  //     11111 | 0010000 | 00011111 <- underflow
+  //           | 0010000 | 00100000 <- no underflow
+  // because subnormals have an implicit 0 instead of implicit 1, we effectively have
+  // one fewer bits for the significand.  If treating it as a normal number would not
+  // have rounded up (with a correction for RTP/RTN), then it is still an underflow
+  prop roundedSubnormal(roundedResult.inSubnormalRange(format, prop(true)));
+  prop roundToMaxCorrection(
+    ITE(roundingMode == t::RTP() || roundingMode == t::RTN(),
+      !choosenGuardBit, prop(false)));
+  prop stillTiny(roundedSubnormal || !roundUpNormal || roundToMaxCorrection);
+  prop tinyAfterRounding(tinyBeforeRounding && stillTiny);
   floatWithStatusFlags<t> roundedResult_flagged(roundedResult,
-      prop(false), prop(false), prop(false), tinyBeforeRounding, inexact);
+      prop(false), prop(false), prop(false), tinyAfterRounding, inexact);
   floatWithStatusFlags<t> result_flagged(rounderSpecialCases_flagged<t>(format, roundingMode, roundedResult_flagged,
       overflow, underflow, uf.getZero()));
 					      

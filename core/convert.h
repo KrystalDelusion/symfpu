@@ -397,7 +397,7 @@ template <class t>
  // Only handles normal, subnormal and zero cases, overflow of targetWidth will give junk.
  // Inf, NaN, and overflow must be handled by the caller.
  template <class t>
-   significandRounderResult<t> convertFloatToBVRTZ (const typename t::fpt &format,
+   significandRounderResult<t> convertFloatToBVRTZ (const typename t::fpt &/*format*/,
 						    const unpackedFloat<t> &input,
 						    const typename t::bwt &targetWidth,
 						    const typename t::bwt &decimalPointPosition) {

@@ -324,7 +324,7 @@ template <class t>
  // Note that the results will be junk if it is not in bounds, etc.
  // convertFloatToUBV and convertFloatToSBV handle all of that logic.
  template <class t>
-   significandRounderResult<t> convertFloatToBV (const typename t::fpt &format,
+   significandRounderResult<t> convertFloatToBV (const typename t::fpt &/*format*/,
 						 const typename t::rm &roundingMode,
 						 const unpackedFloat<t> &input,
 						 const typename t::bwt &targetWidth,
